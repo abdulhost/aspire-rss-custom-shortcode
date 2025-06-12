@@ -1,8 +1,8 @@
 <?php
 /*
-Plugin Name: Lightweight RSS Carousel
-Description: A shortcode to display RSS feed posts in a carousel dynamically.
-Version: 1.0.0
+Plugin Name: Aspire Custom Plugin
+Description: A shortcode to display RSS feed posts in a carousel dynamically, styled for Listivo theme.
+Version: 1.1.0
 Author: Grok
 License: GPL-2.0+
 */
@@ -11,11 +11,13 @@ if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
 }
 
-// Enqueue Slick Slider assets
+// Enqueue assets
 function lrc_enqueue_assets() {
     if (!is_admin()) {
         // Slick Slider CSS
         wp_enqueue_style('slick-css', 'https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css', array(), '1.8.1');
+        // Font Awesome for icons
+        wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css', array(), '6.4.2');
         // Slick Slider JS
         wp_enqueue_script('slick-js', 'https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js', array('jquery'), '1.8.1', true);
     }
@@ -27,10 +29,12 @@ function lrc_rss_carousel_shortcode($atts) {
     // Shortcode attributes
     $atts = shortcode_atts(array(
         'url' => '',
+        'limit' => 10, // Default to 10 posts
     ), $atts, 'rss_carousel');
 
-    // Sanitize and validate URL
+    // Sanitize and validate inputs
     $rss_url = esc_url_raw($atts['url']);
+    $limit = max(6, min(10, absint($atts['limit']))); // Enforce 6–10 range
     if (empty($rss_url)) {
         return '<p>Error: No RSS feed URL provided.</p>';
     }
@@ -56,14 +60,17 @@ function lrc_rss_carousel_shortcode($atts) {
     ob_start();
     ?>
     <div class="lrc-rss-carousel">
-        <?php foreach ($xml->channel->item as $item) : ?>
-            <?php
+        <?php
+        $count = 0;
+        foreach ($xml->channel->item as $item) :
+            if ($count >= $limit) break; // Stop after limit
+            $count++;
             // Extract data
             $title = esc_html((string)$item->title);
             $link = esc_url((string)$item->link);
             $description = wp_trim_words(strip_tags((string)$item->description), 20, '...');
             
-            // Try to find an image (from media:content or enclosure)
+            // Try to find an image
             $image = '';
             if (isset($item->children('media', true)->content)) {
                 $media = $item->children('media', true)->content;
@@ -75,23 +82,148 @@ function lrc_rss_carousel_shortcode($atts) {
             }
             ?>
             <div class="lrc-slide">
-                <div class="lrc-item" style="border: 1px solid #ddd; padding: 15px; margin: 10px; background: #fff;">
+                <div class="lrc-item">
                     <?php if ($image) : ?>
-                        <img src="<?php echo $image; ?>" alt="<?php echo $title; ?>" style="max-width: 100%; height: auto; margin-bottom: 10px;">
+                        <div class="lrc-image">
+                            <img src="<?php echo $image; ?>" alt="<?php echo $title; ?>">
+                        </div>
+                    <?php else : ?>
+                        <div class="lrc-image lrc-no-image">
+                            <!-- Placeholder for no image -->
+                            <span>No Image</span>
+                        </div>
                     <?php endif; ?>
-                    <h3 style="font-size: 18px; margin: 0 0 10px;"><?php echo $title; ?></h3>
-                    <p style="font-size: 14px; margin: 0 0 10px;"><?php echo $description; ?></p>
-                    <a href="<?php echo $link; ?>" target="_blank" style="color: #0073aa;">Read More</a>
+                    <div class="lrc-content">
+                        <h3><?php echo $title; ?></h3>
+                        <p><?php echo $description; ?></p>
+                        <a href="<?php echo $link; ?>" target="_blank" class="lrc-read-more">Read More</a>
+                    </div>
                 </div>
             </div>
         <?php endforeach; ?>
     </div>
 
     <style>
-        .lrc-rss-carousel { margin: 20px 0; }
-        .lrc-slide { padding: 0 10px; }
-        .lrc-item { text-align: center; }
-        .slick-prev:before, .slick-next:before { color: #000; }
+        .lrc-rss-carousel {
+            margin: 30px 0;
+            max-width: 1170px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .lrc-slide {
+            padding: 0 15px;
+        }
+        .lrc-item {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .lrc-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        }
+        .lrc-image {
+            height: 200px;
+            overflow: hidden;
+        }
+        .lrc-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .lrc-no-image {
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 14px;
+        }
+        .lrc-content {
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .lrc-content h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 10px;
+            color: #333;
+            line-height: 1.4;
+        }
+        .lrc-content p {
+            font-size: 14px;
+            color: #666;
+            margin: 0 0 15px;
+            line-height: 1.6;
+        }
+        .lrc-read-more {
+            display: inline-block;
+            color: #0073aa;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        .lrc-read-more:hover {
+            color: #005177;
+        }
+        .slick-prev, .slick-next {
+            width: 40px;
+            height: 40px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+        .slick-prev {
+            left: -50px;
+        }
+        .slick-next {
+            right: -50px;
+        }
+        .slick-prev:before, .slick-next:before {
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            color: #333;
+            font-size: 20px;
+        }
+        .slick-prev:before {
+            content: '\f053';
+        }
+        .slick-next:before {
+            content: '\f054';
+        }
+        .slick-dots li button:before {
+            font-size: 10px;
+            color: #0073aa;
+        }
+        .slick-dots li.slick-active button:before {
+            color: #005177;
+        }
+        @media (max-width: 768px) {
+            .slick-prev {
+                left: 10px;
+            }
+            .slick-next {
+                right: 10px;
+            }
+        }
+        @media (max-width: 480px) {
+            .lrc-item {
+                min-height: 350px;
+            }
+            .lrc-image {
+                height: 150px;
+            }
+        }
     </style>
 
     <script>
